@@ -504,7 +504,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
 index d772fe4..243e9e8 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
-@@ -27,10 +27,21 @@
+@@ -27,11 +27,22 @@
  #include <linux/bootmem.h>
  #include <linux/task_work.h>
  #include <linux/sched/task.h>
@@ -514,6 +514,13 @@ index d772fe4..243e9e8 100644
  
  #include "pnode.h"
  #include "internal.h"
+ #ifdef CONFIG_OPLUS_SECURE_GUARD
+ #ifdef CONFIG_OPLUS_MOUNT_BLOCK
+ #ifdef CONFIG_OPLUS_KEVENT_UPLOAD
+ #include <linux/oplus_kevent.h>
+ #endif /* CONFIG_OPLUS_KEVENT_UPLOAD */
+ #endif /* CONFIG_OPLUS_MOUNT_BLOCK */
+ #endif /* CONFIG_OPLUS_SECURE_GUARD*/
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
@@ -524,7 +531,6 @@ index d772fe4..243e9e8 100644
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
  /* Maximum number of mounts in a mount namespace */
- unsigned int sysctl_mount_max __read_mostly = 100000;
  
 @@ -120,6 +131,13 @@ retry:
  static void mnt_free_id(struct mount *mnt)
@@ -921,9 +927,9 @@ index c62a87e..a344469 100644
 +				unsigned long ino = inode->i_ino;
 +				dev_t dev = inode->i_sb->s_dev;
 +				susfs_sus_kstat_spoof_inotify_fdinfo(&ino, &dev);
-+				seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
++				seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:%x ",
 +						inode_mark->wd, ino, dev,
-+						inotify_mark_user_mask(mark));
++						mark->mask & IN_ALL_EVENTS, mark->ignored_mask);
 +				show_mark_fhandle(m, inode);
 +				seq_putc(m, '\n');
 +				iput(inode);
@@ -951,9 +957,9 @@ index c62a87e..a344469 100644
 +				if (!d_backing_inode(path.dentry)) {
 +					goto out_path_put;
 +				}
-+				seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
++				seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:%x ",
 +						inode_mark->wd, d_backing_inode(path.dentry)->i_ino, d_backing_inode(path.dentry)->i_sb->s_dev,
-+						inotify_mark_user_mask(mark));
++						mark->mask & IN_ALL_EVENTS, mark->ignored_mask);
 +				show_mark_fhandle(m, d_backing_inode(path.dentry));
 +				seq_putc(m, '\n');
 +				path_put(&path);
@@ -968,9 +974,9 @@ index c62a87e..a344469 100644
 +		}
 +orig_flow:
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
- 		seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:0 ",
+ 		seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:%x ",
  			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
- 			   inotify_mark_user_mask(mark));
+ 			   mark->mask & IN_ALL_EVENTS, mark->ignored_mask);
 diff --git a/fs/proc/base.c b/fs/proc/base.c
 index 0495111..e86c03f 100644
 --- a/fs/proc/base.c
@@ -1154,7 +1160,6 @@ index 1347939..5c594b9 100644
 @@ -20,6 +20,9 @@
  #include <linux/uaccess.h>
  #include <linux/mm_inline.h>
- #include <linux/ctype.h>
 +#if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
 +#include <linux/susfs_def.h>
 +#endif // #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
@@ -1225,22 +1230,6 @@ index 1347939..5c594b9 100644
  	smaps_walk.private = mss;
  
  #ifdef CONFIG_SHMEM
-@@ -892,7 +935,6 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
- 			   vma_kernel_pagesize(vma) >> 10,
- 			   vma_mmu_pagesize(vma) >> 10);
- 
--
- 	if (!rollup_mode || last_vma)
- 		seq_printf(m,
- 			   "Rss:            %8lu kB\n"
-@@ -932,6 +974,7 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
- 		arch_show_smap(m, vma);
- 		show_smap_vma_flags(m, vma);
- 	}
-+
- 	m_cache_vma(m, vma);
- 	return ret;
- }
 @@ -1618,6 +1661,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  	while (count && (start_vaddr < end_vaddr)) {
  		int len;
