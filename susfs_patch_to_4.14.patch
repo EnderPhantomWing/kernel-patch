@@ -504,7 +504,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
 index d772fe4..243e9e8 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
-@@ -27,11 +27,22 @@
+@@ -27,15 +27,26 @@
  #include <linux/bootmem.h>
  #include <linux/task_work.h>
  #include <linux/sched/task.h>
