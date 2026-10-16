@@ -501,10 +501,10 @@ index 80b743c..c27fde5 100644
  		if (!d_is_symlink(dentry))
  			return -EINVAL;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index d772fe4..243e9e8 100644
+index d772fe4..b1170b4 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
-@@ -27,15 +27,26 @@
+@@ -27,10 +27,21 @@
  #include <linux/bootmem.h>
  #include <linux/task_work.h>
  #include <linux/sched/task.h>
@@ -514,13 +514,6 @@ index d772fe4..243e9e8 100644
  
  #include "pnode.h"
  #include "internal.h"
- #ifdef CONFIG_OPLUS_SECURE_GUARD
- #ifdef CONFIG_OPLUS_MOUNT_BLOCK
- #ifdef CONFIG_OPLUS_KEVENT_UPLOAD
- #include <linux/oplus_kevent.h>
- #endif /* CONFIG_OPLUS_KEVENT_UPLOAD */
- #endif /* CONFIG_OPLUS_MOUNT_BLOCK */
- #endif /* CONFIG_OPLUS_SECURE_GUARD*/
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
@@ -531,6 +524,7 @@ index d772fe4..243e9e8 100644
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
  /* Maximum number of mounts in a mount namespace */
+ unsigned int sysctl_mount_max __read_mostly = 100000;
  
 @@ -120,6 +131,13 @@ retry:
  static void mnt_free_id(struct mount *mnt)
@@ -787,23 +781,21 @@ index d772fe4..243e9e8 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1119,6 +1328,15 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1119,6 +1328,13 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  
  	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
  	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
 +
 +
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
-+		if (susfs_is_current_ksu_domain() && (flag & CL_COPY_MNT_NS))
++	if (unlikely(is_mnt_ksu_unshared))
 +		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
-+	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
  	/* Don't allow unprivileged users to change mount flags */
  	if (flag & CL_UNPRIVILEGED) {
  		mnt->mnt.mnt_flags |= MNT_LOCK_ATIME;
-@@ -3059,6 +3277,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3059,6 +3275,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
  	if (user_ns != ns->user_ns)
  		copy_flags |= CL_SHARED_TO_SLAVE | CL_UNPRIVILEGED;
@@ -813,7 +805,7 @@ index d772fe4..243e9e8 100644
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-@@ -3635,3 +3856,43 @@ const struct proc_ns_operations mntns_operations = {
+@@ -3635,3 +3854,43 @@ const struct proc_ns_operations mntns_operations = {
  	.install	= mntns_install,
  	.owner		= mntns_owner,
  };
@@ -858,7 +850,6 @@ index d772fe4..243e9e8 100644
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
-index c62a87e..a344469 100644
 --- a/fs/notify/fdinfo.c
 +++ b/fs/notify/fdinfo.c
 @@ -13,6 +13,9 @@
@@ -916,8 +907,10 @@ index c62a87e..a344469 100644
  {
  	struct inotify_inode_mark *inode_mark;
  	struct inode *inode;
-@@ -88,9 +111,63 @@ static void inotify_fdinfo(struct seq_file *m, struct fsnotify_mark *mark)
- 		u32 mask = mark->mask & IN_ALL_EVENTS;
+@@ -83,6 +106,62 @@ static void inotify_fdinfo(struct seq_file *m, struct fsnotify_mark *mark)
+ 	inode_mark = container_of(mark, struct inotify_inode_mark, fsn_mark);
+ 	inode = igrab(mark->connector->inode);
+ 	if (inode) {
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 +		if (susfs_is_current_app_uid()) {
 +			bool is_fuse = false;
@@ -927,7 +920,7 @@ index c62a87e..a344469 100644
 +				susfs_sus_kstat_spoof_inotify_fdinfo(&ino, &dev);
 +				seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:%x ",
 +						inode_mark->wd, ino, dev,
-+						mask, mark->ignored_mask);
++						mark->mask & IN_ALL_EVENTS, mark->ignored_mask);
 +				show_mark_fhandle(m, inode);
 +				seq_putc(m, '\n');
 +				iput(inode);
@@ -957,7 +950,7 @@ index c62a87e..a344469 100644
 +				}
 +				seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:%x ",
 +						inode_mark->wd, d_backing_inode(path.dentry)->i_ino, d_backing_inode(path.dentry)->i_sb->s_dev,
-+						mask, mark->ignored_mask);
++						mark->mask & IN_ALL_EVENTS, mark->ignored_mask);
 +				show_mark_fhandle(m, d_backing_inode(path.dentry));
 +				seq_putc(m, '\n');
 +				path_put(&path);
@@ -972,13 +965,21 @@ index c62a87e..a344469 100644
 +		}
 +orig_flow:
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+ 		/*
+ 		 * IN_ALL_EVENTS represents all of the mask bits
+ 		 * that we expose to userspace.  There is at
+ 		 * least one bit (FS_EVENT_ON_CHILD) which is
+ 		 * used only internally to the kernel.
+ 		 */
+ 		u32 mask = mark->mask & IN_ALL_EVENTS;
  		seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:%x ",
  			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
--			   mark->mask & IN_ALL_EVENTS, mark->ignored_mask);
-+			   mask, mark->ignored_mask);
+ 			   mask, mark->ignored_mask);
  		show_mark_fhandle(m, inode);
  		seq_putc(m, '\n');
  		iput(inode);
+ 	}
+ }
 diff --git a/fs/proc/base.c b/fs/proc/base.c
 index 0495111..e86c03f 100644
 --- a/fs/proc/base.c
@@ -1162,6 +1163,7 @@ index 1347939..5c594b9 100644
 @@ -20,6 +20,9 @@
  #include <linux/uaccess.h>
  #include <linux/mm_inline.h>
+ #include <linux/ctype.h>
 +#if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
 +#include <linux/susfs_def.h>
 +#endif // #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
@@ -3682,7 +3684,7 @@ index 0000000..7dca01d
 +
 diff --git a/include/linux/susfs.h b/include/linux/susfs.h
 new file mode 100644
-index 0000000..4b9d7cc
+index 0000000..1e0ae04
 --- /dev/null
 +++ b/include/linux/susfs.h
 @@ -0,0 +1,243 @@
