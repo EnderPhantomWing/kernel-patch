@@ -1091,19 +1091,20 @@ index 1347939..5c594b9 100644
  	}
  
  	start = vma->vm_start;
-@@ -831,6 +869,11 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
- 		mss = &mss_stack;
- 	}
+@@ -1123,6 +1171,11 @@ static int show_smap(struct seq_file *m, void *v)
+ 	struct mem_size_stats mss;
+ 
+ 	memset(&mss, 0, sizeof(mss));
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +	if (vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
 +		return 0;
 +#endif
 +
- 	smaps_walk.private = mss;
+ 	smap_gather_stats(vma, &mss);
  
- #ifdef CONFIG_SHMEM
-@@ -1618,6 +1661,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+ 
+@@ -1618,6 +1671,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  	while (count && (start_vaddr < end_vaddr)) {
  		int len;
  		unsigned long end;
@@ -1113,7 +1114,7 @@ index 1347939..5c594b9 100644
  
  		pm.pos = 0;
  		end = (start_vaddr + PAGEMAP_WALK_SIZE) & PAGEMAP_WALK_MASK;
-@@ -1625,7 +1671,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+@@ -1625,7 +1681,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  		if (end < start_vaddr || end > end_vaddr)
  			end = end_vaddr;
  		down_read(&mm->mmap_sem);
