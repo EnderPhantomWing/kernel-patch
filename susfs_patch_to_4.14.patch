@@ -1424,7 +1424,6 @@ index e6f4c7b..ba2055d 100644
 +extern __attribute__((hot)) bool susfs_is_inode_sus_path(struct inode *inode);
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +
-
  int iterate_dir(struct file *file, struct dir_context *ctx)
  {
  	struct inode *inode = file_inode(file);
@@ -1463,7 +1462,7 @@ index e6f4c7b..ba2055d 100644
 +	}
 +	iput(inode);
 +orig_flow:
-+#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
  	buf->result++;
  	dirent = buf->dirent;
  	if (!access_ok(VERIFY_WRITE, dirent,
@@ -1477,6 +1476,16 @@ index e6f4c7b..ba2055d 100644
  	error = iterate_dir(f.file, &buf.ctx);
  	if (buf.result)
  		error = buf.result;
+ 
+ 	fdput_pos(f);
++
++#ifdef CONFIG_KSU_SUSFS_SUS_PATH
++	if (!path_err)
++		path_put(&path);
++#endif
+ 	return error;
+ }
+ 
 @@ -196,6 +225,9 @@ struct linux_dirent {
  struct getdents_callback {
  	struct dir_context ctx;
