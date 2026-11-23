@@ -1476,16 +1476,6 @@ index e6f4c7b..ba2055d 100644
  	error = iterate_dir(f.file, &buf.ctx);
  	if (buf.result)
  		error = buf.result;
- 
- 	fdput_pos(f);
-+
-+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-+	if (!path_err)
-+		path_put(&path);
-+#endif
- 	return error;
- }
- 
 @@ -196,6 +225,9 @@ struct linux_dirent {
  struct getdents_callback {
  	struct dir_context ctx;
@@ -2351,6 +2341,7 @@ index 0000000..e5e0ace
 +		//SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
 +		return true;
 +	}
++
 +	return false;
 +}
 +
@@ -4561,10 +4552,10 @@ index 0000000..e5e0ace
 +
 diff --git a/include/linux/susfs.h b/include/linux/susfs.h
 new file mode 100644
-index 0000000..02038d5
+index 0000000..a58550d
 --- /dev/null
 +++ b/include/linux/susfs.h
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,261 @@
 +#ifndef KSU_SUSFS_H
 +#define KSU_SUSFS_H
 +
